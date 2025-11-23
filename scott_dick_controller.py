@@ -24,8 +24,9 @@ class ScottDickController(KesslerController):
     
         
     def __init__(self):
+        #testomg tjos
         self.eval_frames = 0 #What is this?
-
+    
         # self.targeting_control is the targeting rulebase, which is static in this controller.      
         # Declare variables
         bullet_time = ctrl.Antecedent(np.arange(0,1.0,0.002), 'bullet_time')
