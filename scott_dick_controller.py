@@ -24,15 +24,17 @@ class ScottDickController(KesslerController):
     
         
     def __init__(self):
-        #testomg tjos
         self.eval_frames = 0 #What is this?
     
         # self.targeting_control is the targeting rulebase, which is static in this controller.      
         # Declare variables
         bullet_time = ctrl.Antecedent(np.arange(0,1.0,0.002), 'bullet_time')
         theta_delta = ctrl.Antecedent(np.arange(-1*math.pi/30,math.pi/30,0.1), 'theta_delta') # Radians due to Python
+        asteroid_dist = ctrl.Antecedent(np.arange(0, 800, 1), 'asteroid_dist')
         ship_turn = ctrl.Consequent(np.arange(-180,180,1), 'ship_turn') # Degrees due to Kessler
         ship_fire = ctrl.Consequent(np.arange(-1,1,0.1), 'ship_fire')
+        ship_thrust = ctrl.Consequent(np.arange(-480, 480, 1), 'ship_thrust') # Kessler limits
+        ship_mine = ctrl.Consequent(np.arange(-1, 1, 0.1), 'ship_mine') # -1 = don't drop, +1 = drop mine
         
         #Declare fuzzy sets for bullet_time (how long it takes for the bullet to reach the intercept point)
         bullet_time['S'] = fuzz.trimf(bullet_time.universe,[0,0,0.05])
@@ -48,6 +50,11 @@ class ScottDickController(KesslerController):
         theta_delta['PS'] = fuzz.trimf(theta_delta.universe, [-1*math.pi/90,math.pi/90,2*math.pi/90])
         theta_delta['PM'] = fuzz.trimf(theta_delta.universe, [math.pi/90,2*math.pi/90, math.pi/30])
         theta_delta['PL'] = fuzz.smf(theta_delta.universe,2*math.pi/90,math.pi/30)
+
+        # Fuzzy Sets for Distance to Asteroid
+        asteroid_dist['Close'] = fuzz.zmf(asteroid_dist.universe, 0, 200)
+        asteroid_dist['Medium'] = fuzz.trimf(asteroid_dist.universe, [100, 300, 500])
+        asteroid_dist['Far'] = fuzz.smf(asteroid_dist.universe, 400, 800)
         
         # Declare fuzzy sets for the ship_turn consequent; this will be returned as turn_rate.
         # Hard-coded for a game step of 1/30 seconds
@@ -63,30 +70,43 @@ class ScottDickController(KesslerController):
         #   and returned as the boolean 'fire'
         ship_fire['N'] = fuzz.trimf(ship_fire.universe, [-1,-1,0.0])
         ship_fire['Y'] = fuzz.trimf(ship_fire.universe, [0.0,1,1]) 
+
+        # ### CHANGED: Fuzzy Sets for Thrust and Mine ###
+        ship_thrust['Stop'] = fuzz.trimf(ship_thrust.universe, [-480, 0, 100])
+        ship_thrust['Full'] = fuzz.trimf(ship_thrust.universe, [100, 480, 480])
+        
+        ship_mine['N'] = fuzz.trimf(ship_mine.universe, [-1, -1, 0.0])
+        ship_mine['Y'] = fuzz.trimf(ship_mine.universe, [0.0, 1, 1])
                 
-        #Declare each fuzzy rule
-        rule1 = ctrl.Rule(bullet_time['L'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N']))
-        rule2 = ctrl.Rule(bullet_time['L'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['N']))
-        rule3 = ctrl.Rule(bullet_time['L'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y']))
-        # rule4 = ctrl.Rule(bullet_time['L'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y']))
-        rule5 = ctrl.Rule(bullet_time['L'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y']))
-        rule6 = ctrl.Rule(bullet_time['L'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['N']))
-        rule7 = ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N']))
-        rule8 = ctrl.Rule(bullet_time['M'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N']))
-        rule9 = ctrl.Rule(bullet_time['M'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['N']))
-        rule10 = ctrl.Rule(bullet_time['M'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y']))
-        # rule11 = ctrl.Rule(bullet_time['M'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y']))
-        rule12 = ctrl.Rule(bullet_time['M'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y']))
-        rule13 = ctrl.Rule(bullet_time['M'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['N']))
-        rule14 = ctrl.Rule(bullet_time['M'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N']))
-        rule15 = ctrl.Rule(bullet_time['S'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['Y']))
-        rule16 = ctrl.Rule(bullet_time['S'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y']))
-        rule17 = ctrl.Rule(bullet_time['S'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y']))
-        # rule18 = ctrl.Rule(bullet_time['S'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y']))
-        rule19 = ctrl.Rule(bullet_time['S'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y']))
-        rule20 = ctrl.Rule(bullet_time['S'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y']))
-        rule21 = ctrl.Rule(bullet_time['S'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['Y']))
-     
+        # ### CHANGED: Updated all existing rules to include defaults for thrust (Stop) and mine (N) ###
+        rule1 = ctrl.Rule(bullet_time['L'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule2 = ctrl.Rule(bullet_time['L'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule3 = ctrl.Rule(bullet_time['L'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        # rule4 = ctrl.Rule(bullet_time['L'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule5 = ctrl.Rule(bullet_time['L'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule6 = ctrl.Rule(bullet_time['L'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule7 = ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule8 = ctrl.Rule(bullet_time['M'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule9 = ctrl.Rule(bullet_time['M'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule10 = ctrl.Rule(bullet_time['M'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        # rule11 = ctrl.Rule(bullet_time['M'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule12 = ctrl.Rule(bullet_time['M'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule13 = ctrl.Rule(bullet_time['M'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule14 = ctrl.Rule(bullet_time['M'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N']))
+        rule15 = ctrl.Rule(bullet_time['S'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule16 = ctrl.Rule(bullet_time['S'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule17 = ctrl.Rule(bullet_time['S'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        # rule18 = ctrl.Rule(bullet_time['S'] & theta_delta['Z'], (ship_turn['Z'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule19 = ctrl.Rule(bullet_time['S'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule20 = ctrl.Rule(bullet_time['S'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+        rule21 = ctrl.Rule(bullet_time['S'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N']))
+
+        # Rules for Thrust and Mining ###
+        
+        rule22 = ctrl.Rule(asteroid_dist['Close'], (ship_mine['Y'], ship_thrust['Stop']))
+        rule23 = ctrl.Rule(asteroid_dist['Far'] & theta_delta['NS'], (ship_thrust['Full'], ship_mine['N']))
+        rule24 = ctrl.Rule(asteroid_dist['Far'] & theta_delta['PS'], (ship_thrust['Full'], ship_mine['N']))
+        
         #DEBUG
         #bullet_time.view()
         #theta_delta.view()
@@ -121,6 +141,9 @@ class ScottDickController(KesslerController):
         self.targeting_control.addrule(rule19)
         self.targeting_control.addrule(rule20)
         self.targeting_control.addrule(rule21)
+        self.targeting_control.addrule(rule22)
+        self.targeting_control.addrule(rule23)
+        self.targeting_control.addrule(rule24)
 
         
         
