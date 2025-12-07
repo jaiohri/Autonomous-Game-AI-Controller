@@ -57,8 +57,11 @@ def setup_membership_functions(bullet_time, theta_delta, asteroid_dist, collisio
     ship_fire['Y'] = fuzz.trimf(ship_fire.universe, [0.0, 1, 1])
     
     # Ship thrust membership functions
-    ship_thrust['Stop'] = fuzz.trimf(ship_thrust.universe, [-480, 0, 100])
-    ship_thrust['Full'] = fuzz.trimf(ship_thrust.universe, [100, 480, 480])
+    ship_thrust['Reverse'] = fuzz.trimf(ship_thrust.universe, [-480, -200, -50])
+    ship_thrust['Stop'] = fuzz.trimf(ship_thrust.universe, [-100, 0, 100])
+    ship_thrust['Low'] = fuzz.trimf(ship_thrust.universe, [50, 150, 250])
+    ship_thrust['Medium'] = fuzz.trimf(ship_thrust.universe, [200, 300, 400])
+    ship_thrust['Full'] = fuzz.trimf(ship_thrust.universe, [350, 480, 480])
     
     # Ship mine membership functions
     ship_mine['N'] = fuzz.trimf(ship_mine.universe, [-1, -1, 0.0])
@@ -70,18 +73,18 @@ def create_rules(bullet_time, theta_delta, asteroid_dist, collision_risk, ship_s
     return [
         
         # Firing rules as a function of bullet time (how long until impact) and aim error.
-        ctrl.Rule(bullet_time['L'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(bullet_time['L'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['L'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['L'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['L'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['L'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
-        ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N'])),
-        ctrl.Rule(bullet_time['M'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(bullet_time['L'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(bullet_time['M'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['M'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['M'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['M'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['M'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
-        ctrl.Rule(bullet_time['M'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['N'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(bullet_time['M'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['S'] & theta_delta['NL'], (ship_turn['NL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['S'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(bullet_time['S'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
@@ -90,13 +93,14 @@ def create_rules(bullet_time, theta_delta, asteroid_dist, collision_risk, ship_s
         ctrl.Rule(bullet_time['S'] & theta_delta['PL'], (ship_turn['PL'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         
         # Distance and risk-based tweaks to thrust, firing, and mine usage.
-        ctrl.Rule(asteroid_dist['Close'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['Y'])),
-        ctrl.Rule(asteroid_dist['Close'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['Y'])),
-        ctrl.Rule(asteroid_dist['Close'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['Y'])),
-        ctrl.Rule(asteroid_dist['Close'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['Y'])),
-        ctrl.Rule(asteroid_dist['Close'], (ship_mine['Y'], ship_thrust['Stop'])),
-        ctrl.Rule(asteroid_dist['Far'] & theta_delta['NS'], (ship_thrust['Full'], ship_fire['Y'], ship_mine['N'])),
-        ctrl.Rule(asteroid_dist['Far'] & theta_delta['PS'], (ship_thrust['Full'], ship_fire['Y'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Close'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Close'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Close'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Close'] & theta_delta['PM'], (ship_turn['PM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Close'] & (collision_risk['Low'] | collision_risk['Medium']),
+                  (ship_mine['N'], ship_thrust['Stop'])),
+        ctrl.Rule(asteroid_dist['Far'] & theta_delta['NS'], (ship_thrust['Low'], ship_fire['Y'], ship_mine['N'])),
+        ctrl.Rule(asteroid_dist['Far'] & theta_delta['PS'], (ship_thrust['Low'], ship_fire['Y'], ship_mine['N'])),
         ctrl.Rule(asteroid_dist['Medium'] & theta_delta['NS'], (ship_turn['NS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(asteroid_dist['Medium'] & theta_delta['PS'], (ship_turn['PS'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(asteroid_dist['Medium'] & theta_delta['NM'], (ship_turn['NM'], ship_fire['Y'], ship_thrust['Stop'], ship_mine['N'])),
@@ -104,19 +108,31 @@ def create_rules(bullet_time, theta_delta, asteroid_dist, collision_risk, ship_s
         
         # Collision risk adjusts how aggressively we thrust and fire.
         ctrl.Rule(collision_risk['High'] & asteroid_dist['Close'],
-                  (ship_thrust['Full'], ship_fire['Y'], ship_mine['N'])),
+                  (ship_thrust['Medium'], ship_fire['Y'], ship_mine['Y'])),
         ctrl.Rule(collision_risk['Medium'] & asteroid_dist['Medium'],
-                  (ship_thrust['Full'], ship_fire['Y'], ship_mine['N'])),
+                  (ship_thrust['Low'], ship_fire['Y'], ship_mine['N'])),
         ctrl.Rule(collision_risk['Low'],
                   (ship_thrust['Stop'], ship_mine['N'])),
         
         # Speed-based braking when no immediate threat
         ctrl.Rule(collision_risk['Low'] & ship_speed['High'],
-                  (ship_thrust['Stop'], ship_mine['N'])),
+                  (ship_thrust['Reverse'], ship_mine['N'])),
         ctrl.Rule(collision_risk['Low'] & ship_speed['Medium'],
                   (ship_thrust['Stop'], ship_mine['N'])),
         ctrl.Rule(collision_risk['Low'] & ship_speed['Low'] & asteroid_dist['Far'],
-                  (ship_thrust['Full'], ship_mine['N'])),
+                  (ship_thrust['Low'], ship_mine['N'])),
+        
+        # Don't fire if asteroid is extremely far AND aim is way off AND bullet time is long (very wasteful shot)
+        ctrl.Rule(asteroid_dist['Far'] & bullet_time['L'] & (theta_delta['NL'] | theta_delta['PL']),
+                  (ship_fire['N'],)),
+        
+        # fire whenever there's an asteroid in range (liberal firing because why not, we've got unlimited bullets)
+        ctrl.Rule(asteroid_dist['Close'] | asteroid_dist['Medium'] | asteroid_dist['Far'],
+                  (ship_fire['Y'],)),
+        
+        # stop when low/medium risk and no specific speed/distance conditions
+        ctrl.Rule(collision_risk['Low'] & ship_speed['Low'] & (asteroid_dist['Close'] | asteroid_dist['Medium']),
+                  (ship_thrust['Stop'],)),
     ]
 
 
@@ -126,16 +142,21 @@ class TestController(KesslerController):
     # ga_params is used by the GA to optimize the parameters of the fuzzy system
     def __init__(self, ga_params: Optional[list] = None):
         self.eval_frames = 0
+        self.last_mine_drop_frame = -999
         
-        # Default parameters (optimized using GA). Used to run the controller with scenario_test.py
+        # Default parameters (optimized using GA)
         if ga_params is None:
-            ga_params = [0.31892134330319655, 0.29784899590725256, 0.4202451366192509, 0.4262712518217453]
+            ga_params = [0.24822909454568576, 0.2168790098988791, 0.15056300061439054, 0.49207323935401404]
         
-        # Scale to the universe of the fuzzy system
+        # Scale GA parameters [0, 1] to actual parameter ranges
+        # ga_params[0]: theta_delta_boundary range [π/180 (1°), π/18 (10°)]
         theta_delta_boundary = math.pi/180 + ga_params[0] * (math.pi/18 - math.pi/180)
-        asteroid_dist_close = 100 + ga_params[1] * 300
-        fire_threshold = -0.35 + ga_params[2] * 0.5
-        turn_scale = 0.5 + ga_params[3] * 1.5
+        # ga_params[1]: asteroid_dist_close range [100, 400] units
+        asteroid_dist_close = 100 + ga_params[1] * (400-100)
+        # ga_params[2]: fire_threshold range [-0.85, -0.55] (more negative = more liberal)
+        fire_threshold = -0.85 + ga_params[2] * (-0.55 - (-0.85))
+        # ga_params[3]: turn_scale range [0.5, 2.0] (multiplier for turn rate)
+        turn_scale = 0.5 + ga_params[3] * (2.0 - 0.5)
         
         # Build fuzzy control system
         bullet_time = ctrl.Antecedent(np.arange(0, 1.0, 0.002), 'bullet_time')
@@ -171,64 +192,75 @@ class TestController(KesslerController):
         Method processed each time step by this controller.
         """
         
+        # Ship state
         ship_pos_x = ship_state["position"][0]
         ship_pos_y = ship_state["position"][1]
         ship_radius = float(ship_state["radius"])
         ship_speed = float(ship_state["speed"])
         ship_vel_x, ship_vel_y = ship_state["velocity"]
         
+        # helper function to calculate the difference between two angles
         def angle_diff(a, b):
             return (a - b + math.pi) % (2 * math.pi) - math.pi
 
+        # helper function to check for threats and calculate escape direction along with risk score
         def threat_check():
-            # Find the most urgent collision threat and calculate escape direction
-            collision_horizon = 5.0
-            safety_margin = 5.0
+            # Find most urgent collision threat and escape direction (within 300 units)
+            max_check_distance = 300.0
+            collision_horizon = 3.0
+            safety_margin = 10.0
 
             best_threat_time = None
             best_escape_theta = None
             best_d2 = None
             best_safe_radius = None
 
+            # Loop through all asteroids and check for threats
             for asteroid in game_state["asteroids"]:
                 ax, ay = asteroid["position"]
                 avx, avy = asteroid["velocity"]
                 aradius = float(asteroid["radius"])
 
-                # Relative position and velocity
+                # Calculate relative position and distance
                 rx = ax - ship_pos_x
                 ry = ay - ship_pos_y
+                current_dist = math.sqrt(rx * rx + ry * ry)
+                
+                if current_dist > max_check_distance:
+                    continue  # Skip distant asteroids
+                
+                # Calculate relative velocity
                 rvx = avx - ship_vel_x
                 rvy = avy - ship_vel_y
-
                 v2 = rvx * rvx + rvy * rvy
                 if v2 < 1e-6:
-                    continue
+                    continue  # Skip if relative velocity too small
 
-                # Time to closest approach
+                # Compute time to closest approach
                 rdotv = rx * rvx + ry * rvy
                 t_ca = - rdotv / v2
 
                 if t_ca <= 0.0 or t_ca > collision_horizon:
-                    continue
+                    continue  # Skip if past or too far in future
 
-                # Distance at closest approach
+                # Calculate distance at closest approach
                 rca_x = rx + rvx * t_ca
                 rca_y = ry + rvy * t_ca
                 d2 = rca_x * rca_x + rca_y * rca_y
 
+                # Check if collision is imminent
                 safe_radius = ship_radius + aradius + safety_margin
                 if d2 <= safe_radius * safe_radius:
-                    # Escape angle is opposite to asteroid position
-                    escape_theta = math.atan2(-ry, -rx)
+                    escape_theta = math.atan2(-ry, -rx)  # Escape opposite to threat
 
+                    # Track most urgent threat (earliest collision)
                     if (best_threat_time is None) or (t_ca < best_threat_time):
                         best_threat_time = t_ca
                         best_escape_theta = escape_theta
                         best_d2 = d2
                         best_safe_radius = safe_radius
 
-            # Risk score based on time and distance
+            # Calculate risk score (0.0 = safe, 1.0 = imminent collision)
             risk = 0.0
             if best_threat_time is not None:
                 t_score = max(0.0, min(1.0, (collision_horizon - best_threat_time) / collision_horizon))
@@ -236,6 +268,26 @@ class TestController(KesslerController):
                 d_score = max(0.0, min(1.0, (best_safe_radius - d_min) / best_safe_radius))
                 risk = max(t_score, d_score)
             return best_escape_theta, risk
+
+        # helper function to determine if the ship should drop a mine based on fuzzy output and conditions
+        def should_drop_mine(fuzzy_mine_output: float) -> bool:
+            """Check if mine should be dropped based on fuzzy output and availability."""
+            # Very conservative: require strong fuzzy signal (0.8+) to drop mine
+            fuzzy_mine_signal = bool(fuzzy_mine_output >= 0.8)
+            
+            # Check mine availability
+            if "mines_remaining" in ship_state:
+                has_mines = ship_state["mines_remaining"] > 0
+            else:
+                has_mines = False
+            
+            if "can_deploy_mine" in ship_state:
+                can_drop = ship_state["can_deploy_mine"]
+            else:
+                can_drop = False
+            
+            # Only drop mine if fuzzy system says yes AND mines are available
+            return bool(fuzzy_mine_signal and has_mines and can_drop)
 
         closest_asteroid = None
         
@@ -315,22 +367,42 @@ class TestController(KesslerController):
         tr_min, tr_max = ship_state["turn_rate_range"]
         turn_rate = max(tr_min, min(tr_max, turn_rate))
         
+        # fire based on fuzzy system output
         fire = bool(sim.output['ship_fire'] >= self.fire_threshold)
         
-        # Prioritize escape when threat exists
+        # Constrained mine dropping: only drop when absolutely required
+        drop_mine = should_drop_mine(sim.output['ship_mine'])
+        
+        # Get fuzzy thrust output as baseline
         fuzzy_thrust = float(sim.output['ship_thrust'])
-        if escape_theta is not None:
-            # Always escape when there's a threat - use full thrust in escape direction
+        
+        # Constrained thrust logic with mine escape priority
+        mine_escape_frames = 30
+        frames_since_mine_drop = self.eval_frames - self.last_mine_drop_frame
+        
+        # PRIORITY 1: Escape from recently dropped mine (safety override)
+        if drop_mine:
+            self.last_mine_drop_frame = self.eval_frames
+            thrust = reverse_thrust  # Full reverse to escape
+        elif frames_since_mine_drop < mine_escape_frames:
+            # Continue escaping from mine
+            thrust = reverse_thrust * 0.8
+            
+        # PRIORITY 2: Avoid incoming asteroid collisions (safety override)
+        elif escape_theta is not None and risk > 0.3:
             df = abs(angle_diff(escape_theta, heading_rad))
             db = abs(angle_diff(escape_theta, heading_rad + math.pi))
-            thrust = forward_thrust if df <= db else reverse_thrust
+            
+            if db < df:
+                thrust = reverse_thrust * 0.4
+            else:
+                thrust = forward_thrust * 0.3
+                
+        # PRIORITY 3: Use fuzzy thrust output for normal operation
         else:
-            # No threat - use fuzzy output for speed-based control
             thrust = fuzzy_thrust
         
         thrust = max(thrust_min, min(thrust_max, thrust))
-
-        drop_mine = False
         
         self.eval_frames +=1
         
