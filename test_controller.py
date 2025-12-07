@@ -207,8 +207,8 @@ class TestController(KesslerController):
         def threat_check():
             # Find most urgent collision threat and escape direction (within 300 units)
             max_check_distance = 300.0
-            collision_horizon = 3.0
-            safety_margin = 10.0
+            collision_horizon = 3.0 # how far into the future to check for threats
+            safety_margin = 10.0 # how much space to leave between the ship and the threat
 
             best_threat_time = None
             best_escape_theta = None
@@ -271,8 +271,7 @@ class TestController(KesslerController):
 
         # helper function to determine if the ship should drop a mine based on fuzzy output and conditions
         def should_drop_mine(fuzzy_mine_output: float) -> bool:
-            """Check if mine should be dropped based on fuzzy output and availability."""
-            # Very conservative: require strong fuzzy signal (0.8+) to drop mine
+            # Require strong fuzzy signal (0.8+) to drop mine because mines create chaos and are used as a last resort. Plus, we only have 3 mines.
             fuzzy_mine_signal = bool(fuzzy_mine_output >= 0.8)
             
             # Check mine availability
@@ -355,6 +354,7 @@ class TestController(KesslerController):
             max_spd = 240.0
         normalized_speed = min(1.0, ship_speed / max_spd) if max_spd > 0 else 0.0
 
+        # Compute fuzzy system outputs
         sim = ctrl.ControlSystemSimulation(self.targeting_control, flush_after_run=1)
         sim.input['bullet_time'] = bullet_t
         sim.input['theta_delta'] = shooting_theta
@@ -363,6 +363,7 @@ class TestController(KesslerController):
         sim.input['ship_speed'] = normalized_speed
         sim.compute()
         
+        # Get turn rate from fuzzy system
         turn_rate = float(sim.output['ship_turn']) * self.turn_scale
         tr_min, tr_max = ship_state["turn_rate_range"]
         turn_rate = max(tr_min, min(tr_max, turn_rate))
@@ -417,7 +418,6 @@ class TestController(KesslerController):
 
 
 # Simple Genetic Algorithm for Optimization
-
 def extract_genes(chromosome):
     if hasattr(chromosome, 'gene_list'):
         genes = chromosome.gene_list
@@ -428,11 +428,10 @@ def extract_genes(chromosome):
     
     return [float(g.value if hasattr(g, 'value') else g) for g in genes]
 
-
+# Genetic Algorithm for Optimization
 if __name__ == "__main__":
-    # Fitness function
+    # Fitness function (lower is better)
     def fitness(chromosome):
-        """Evaluate controller performance. Lower is better."""
         try:
             params = extract_genes(chromosome)
             controller = TestController(ga_params=params)
