@@ -1,5 +1,34 @@
+# ECE 449 Intelligent Systems Engineering
+# Group Project Assignment
+# Fall 2025
+# --------------------------------------------------------------
+# MEMBERS:
+# - Jai Ohri (ohri1)
+# - Orion Arthur Warawa (owarawa)
+# - Haris Nisar Tanoli (htanoli)
+# --------------------------------------------------------------
+# REFERENCES:
+# [1] D. Wilczak, "EasyGA: A Python genetic algorithm library," GitHub 
+#     repository, 2021. [Online]. Available: 
+#     https://github.com/danielwilczak101/EasyGA
+
+# [2] Thales Group, "Kessler Game: Asteroids arcade game implementation 
+#     for AI research," GitHub repository, 2023. [Online]. Available: 
+#     https://github.com/ThalesGroup/kessler-game
+
+# [3] ECE 449: Intelligent Systems Engineering, University of Alberta, 
+#     Fall 2024. Lab 4: Fuzzy Logic Controllers.
+#
+# [4] ECE 449: Intelligent Systems Engineering, University of Alberta, 
+#     Fall 2024. Lab 5: Genetic Algorithms.
+# 
+# [5] "scikit-fuzzy Examples," Python Hosted. [Online]. Available: 
+#     https://pythonhosted.org/scikit-fuzzy/auto_examples/index.html
+
+
+
 from kesslergame import KesslerController
-from kesslergame import Scenario, KesslerGame
+from kesslergame import Scenario, TrainerEnvironment, GraphicsType
 from typing import Dict, Tuple, Optional
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
@@ -136,7 +165,7 @@ def create_rules(bullet_time, theta_delta, asteroid_dist, collision_risk, ship_s
     ]
 
 
-class TestController(KesslerController):
+class CustomController(KesslerController):
     
     
     # ga_params is used by the GA to optimize the parameters of the fuzzy system
@@ -414,7 +443,7 @@ class TestController(KesslerController):
 
     @property
     def name(self) -> str:
-        return "Test Controller"
+        return "Custom Controller"
 
 
 # Simple Genetic Algorithm for Optimization
@@ -434,20 +463,24 @@ if __name__ == "__main__":
     def fitness(chromosome):
         try:
             params = extract_genes(chromosome)
-            controller = TestController(ga_params=params)
+            controller = CustomController(ga_params=params)
             
             scenario = Scenario(
                 name='GA Test',
-                num_asteroids=5,
+                num_asteroids=10,
                 ship_states=[{'position': (400, 400), 'angle': 90, 'lives': 3, 'team': 1, "mines_remaining": 3}],
                 map_size=(1000, 800),
-                time_limit=30,
+                time_limit=20,
                 ammo_limit_multiplier=0,
                 stop_if_no_ammo=False
             )
             
-            game_settings = {'perf_tracker': True, 'frequency': 30}
-            game = KesslerGame(settings=game_settings)
+            game_settings = {'perf_tracker': True,
+                 'graphics_type': GraphicsType.Tkinter,
+                 'realtime_multiplier': 1,
+                 'graphics_obj': None,
+                 'frequency': 30}
+            game = TrainerEnvironment(settings=game_settings)
             
             score, _ = game.run(scenario=scenario, controllers=[controller])
             team_score = score.teams[0]
@@ -466,8 +499,8 @@ if __name__ == "__main__":
     print("Running Simple GA Optimization...")
     ga = EasyGA.GA()
     ga.chromosome_length = 4
-    ga.population_size = 10
-    ga.generation_goal = 5
+    ga.population_size = 15
+    ga.generation_goal = 30
     ga.target_fitness_type = "min"
     ga.gene_impl = lambda: random.random()
     ga.fitness_function_impl = fitness
